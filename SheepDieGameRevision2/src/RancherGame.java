@@ -1,10 +1,10 @@
-//test
-
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.FileNotFoundException;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Random;
 
@@ -18,85 +18,84 @@ import javax.swing.Timer;
 
 @SuppressWarnings("serial")
 public class RancherGame extends JFrame implements GameSettings {
+	// ///////////////////////////////////////////////////////////////////
+	private String dadsName = null;
+	private boolean foundDaddy = false;
+	private static final long serialVersionUID = 1L;
+	private String userName;
+	private Socket socket;
+	private In in;
+	private Out out;
+	// ///////////////////this is new/////////////////////////////////////
 	private boolean wolfIsPushed = false;
-	private RangeCanvas rangeCanvas = new RangeCanvas();;
-	private JTextField SheepX = new JTextField(2);
-	private JTextField SheepY = new JTextField(2);
-	private JTextField WolfX = new JTextField(2);
-	private JTextField WolfY = new JTextField(2);
-	private int numberOfSheep = 5;
-	private int numberOfWolfs = 2;
+	private RangeCanvas rangeCanvas = new RangeCanvas();
 	private JButton huntButton = new JButton("hunt");
 	private ArrayList<Wolf> wolfs = new ArrayList<Wolf>();
 	private ArrayList<Sheep> sheeps = new ArrayList<Sheep>();
-	private Sheep sheep = new Sheep(INIT_SHEEP_X, INIT_SHEEP_Y, SHEEP_COLOR);
-	private Wolf wolf = new Wolf(INIT_WOLF_X, INIT_WOLF_Y, WOLF_COLOR);;
-
 	private final Timer timer;
+	private final StopWatch timeToLunch = new StopWatch();
+	private boolean gameOver = false;
+	private JTextField currentTime = new JTextField(String.valueOf(timeToLunch
+			.getCurrentTime()));
 
-	private void finish() {
-		timer.stop();
-	}
+	public RancherGame(String userName, String server, int port) {
 
-	private void updatePositions() {
-		sheep.setX(Integer.parseInt(SheepX.getText().trim()));
-		sheep.setY(Integer.parseInt(SheepY.getText().trim()));
+		// ///////////////////////////////////////////////////////////////////
+		this.userName = userName;
+		try {
+			socket = new Socket(server, port);
+			out = new Out(socket);
+			in = new In(socket);
 
-		wolf.setX(Integer.parseInt(WolfX.getText().trim()));
-		wolf.setY(Integer.parseInt(WolfY.getText().trim()));
-
-		rangeCanvas.repaint();
-	}
-
-	public RancherGame() {
-
+			out.println("/register " + userName);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		// ///////////////////////this is
+		// new////////////////////////////////////
 		// layout etc
-		JPanel panel = new JPanel();
+		final JPanel panel = new JPanel();
 		add(rangeCanvas);
-		panel.add(new JLabel("Wolf (x,y) = "));
-		panel.add(WolfX);
-		panel.add(WolfY);
-		panel.add(new JLabel(" "));
+		GridLayout layout = new GridLayout(5, 2);
+		layout.setVgap(20);
+		layout.setHgap(20);
+		panel.setLayout(layout);
+		panel.add(new JLabel());
 		panel.add(huntButton);
-		panel.add(new JLabel(" "));
-		panel.add(new JLabel("Sheep (x,y) = "));
-		panel.add(SheepX);
-		panel.add(SheepY);
-		add(panel, BorderLayout.SOUTH);
-		rangeCanvas.addEntity(sheep);
-		wolfs.add(wolf);
-		Random random = new Random();
-		sheeps.add(sheep);
-		for (int q = 0; q < numberOfSheep; q++){
-			sheeps.add(new Sheep(2,random.nextInt(9),Color.pink));
-		}
-		for (Sheep sheep: sheeps){
-			rangeCanvas.addEntity(sheep);
-		}
-		for (int q = 0; q < numberOfWolfs; q++){
-			wolfs.add(new Wolf(10,random.nextInt(7),Color.MAGENTA));
-		}
-		for(Wolf wolf:wolfs){
-		rangeCanvas.addEntity(wolf);
-		}
+		panel.add(new JLabel("Number of Sheep"));
+		panel.add(new JTextField(String.valueOf(input.getNumberOfSheep())));
+		panel.add(new JLabel("Number of Wolves"));
+		panel.add(new JTextField(String.valueOf(input.getNumberOfWolfs())));
+		panel.add(new JLabel("Game Speed"));
+		panel.add(new JTextField(String.valueOf(input.getSpeed())));
+		panel.add(new JLabel("Current Time"));
+		panel.add(currentTime);
+		add(panel, BorderLayout.EAST);
+
+		setTheAnimals();
 		rangeCanvas.addGrassFractal();
 
 		timer = new Timer(BOARD_REFRESH_RATE, new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				// System.out.println(wolf + " " + sheep);
-
 				rangeCanvas.repaint();
-				if (areSheepsAlive()) {
-					finish();
+				// wolfsPlayTag();
+
+				if (areSheepsAlive() == true && gameOver == false) {
+					JOptionPane.showMessageDialog(null,
+							("Time: " + timeToLunch.stopTiming()) + " Seconds!");
+					gameOver = true;
+					panel.repaint();
 				}
 			}
 
 			private boolean areSheepsAlive() {
-				for (Sheep sheep: sheeps){
-					if (sheep.isAlive()){
+				for (Sheep sheep : sheeps) {
+					if (sheep.isAlive()) {
 						return false;
 					}
 				}
+
 				return true;
 			}
 		});
@@ -105,69 +104,97 @@ public class RancherGame extends JFrame implements GameSettings {
 		huntButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if (!wolfIsPushed) {
-					Object[] options = { "No, thanks", "Yes, please" };
-					int n = JOptionPane
-							.showOptionDialog(
-									null,
-									"Would you like to see what squares the wolf has visited? ",
-									"Track the wolfs steps",
-									JOptionPane.YES_NO_CANCEL_OPTION,
-									JOptionPane.QUESTION_MESSAGE, null,
-									options, options[1]);
-					Object[] options2 = { "No, Grass", "Yes, On the Grass",
-							"Grass makes wolf slower" };
-					int g = JOptionPane
-							.showOptionDialog(
-									null,
-									"Would you like to see grass effect the wolf or just see grass? ",
-									"Do you want grass with that?",
-									JOptionPane.YES_NO_CANCEL_OPTION,
-									JOptionPane.QUESTION_MESSAGE, null,
-									options2, options2[2]);
-					if (g > 0) {
-						rangeCanvas.setGrassNeeded();
-					}
+
 					timer.start();
-					// System.out.println(n+" this is your answer should be zero");
-					for (Sheep sheep:sheeps){
-						sheep.setWolfs(wolfs);
-					sheep.squirm();
-					}
-					for (Wolf wolf: wolfs){
-					wolf.hunt(sheeps, wolfs, n, rangeCanvas.getGrassArray(), g);
-					}
+					timeToLunch.startTiming();
+					startMovingSheep();
+					wolfsPlayTag();
+					giveWolfHisSheep();
+					startMovingWolfs();
+
 					wolfIsPushed = true;
 				}
+				makeOneSheepAlive();
 			}
+
 		});
 
-		SheepX.setText("" + sheep.getX());
-		SheepX.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				updatePositions();
-			}
-		});
+	}
 
-		SheepY.setText("" + sheep.getY());
-		SheepY.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				updatePositions();
+	private void makeOneSheepAlive() {
+		for (Sheep sheep : sheeps) {
+			if (!sheep.isAlive()) {
+				sheep.reviveMe();
+				return;
 			}
-		});
+		}
+	}
 
-		WolfX.setText("" + wolf.getX());
-		WolfX.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				updatePositions();
-			}
-		});
+	private void makeAllSheepsAlive() {
+		for (Sheep sheep : sheeps) {
+			sheep.reviveMe();
+		}
+	}
 
-		WolfY.setText("" + wolf.getY());
-		WolfY.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				updatePositions();
+	private void startMovingWolfs() {
+		for (Wolf wolf : wolfs) {
+			wolf.hunt(wolfs);
+		}
+	}
+
+	private void startMovingSheep() {
+		for (Sheep sheep : sheeps) {
+			sheep.setWolfs(wolfs);
+			sheep.squirm();
+		}
+	}
+
+	private void giveWolfHisSheep() {
+		for (Sheep sheep : sheeps) {
+			for (Wolf wolf : wolfs) {
+				wolf.addSheep(sheep);
 			}
-		});
+		}
+
+	}
+
+	private void giveWolfOneSheep(Sheep sheep) {
+		for (Wolf wolf : wolfs) {
+			wolf.addSheep(sheep);
+		}
+	}
+
+	private void setTheAnimals() {
+		Random random = new Random();
+		for (int q = 0; q < numberOfSheeps; q++) {
+			sheeps.add(new Sheep(random.nextInt(max_X - 1), random
+					.nextInt(max_Y - 1), SHEEP_COLOR));
+		}
+		if (input.getPositions().size() == 0) {
+
+			for (int q = 0; q < numberOfWolfs; q++) {
+				wolfs.add(new Wolf(random.nextInt(max_X - 1), random
+						.nextInt(max_Y - 1), WOLF_COLOR));
+			}
+		} else {
+			for (String s : input.getPositions()) {
+				String xy[] = s.split(",");
+				wolfs.add(new Wolf(Integer.parseInt(xy[0]), Integer
+						.parseInt(xy[1]), WOLF_COLOR));
+
+			}
+		}
+		giveTheAnimalsToCanvas();
+	}
+
+	private void giveTheAnimalsToCanvas() {
+
+		for (Wolf wolf : wolfs) {
+			rangeCanvas.addEntity(wolf);
+		}
+		for (Sheep sheep : sheeps) {
+			rangeCanvas.addEntity(sheep);
+		}
 
 	}
 
@@ -179,22 +206,406 @@ public class RancherGame extends JFrame implements GameSettings {
 		}
 	}
 
-	public static void main(String args[]) {
-		/*
-		 * What I did here was add in a dialog to ask the user if he would like to edit the
-		 * settings. The default is just to start the game by reading the settings already
-		 * defined. - E
-		 */
-		int editSettings = JOptionPane.showConfirmDialog(null, "Would you like to edit settings?");
-		if (editSettings == 0){
-			System.out.println("Settings will be edited");
+	public static void pause(int q) {
+		try {
+			Thread.sleep(q);
+		} catch (Exception e) {
+			// uh oh!
 		}
-		RancherGame c = new RancherGame();
-		c.setLayout(new GridLayout(2, 1));
-		c.setSize(B_WIDTH + 120, B_HEIGHT + 120);
+	}
+
+	private void wolfsPlayTag() {
+		for (Wolf wolf : wolfs) {
+			wolf.yourIt();
+			return;
+		}
+	}
+
+	public static void main(String args[]) throws Exception {
+		try {
+			new input();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		/*
+		 * What I did here was add in a dialog to ask the user if he would like
+		 * to edit the settings. The default is just to start the game by
+		 * reading the settings already defined. - E
+		 */
+		serverThread();
+		// starts a thread for chat server you dont have to make it work on its own anymore
+		
+		chatClientThread();
+		// starts a thread for chat client so it loads it up on its own without you having to open it.
+		RancherGame.pause(100);
+		RancherGame c = new RancherGame("Game", "localhost",
+				Integer.parseInt("4444"));
+
+		c.setLayout(new GridLayout(1, 1));
+		c.setSize(windowSizeY + 400, windowSizeX + 120);
 		c.setVisible(true);
 		c.setLocationRelativeTo(null);
 		c.setLocationRelativeTo(null);
 		c.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		c.listen();
 	}
+
+	private static void serverThread() {
+		class MyThread extends Thread {
+			public void run() {
+				try {
+					ChatServer.main(null);
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}
+
+		MyThread serverThread = new MyThread();
+		serverThread.start();
+	}
+	private static void chatClientThread() {
+		class MyThread extends Thread {
+			public void run() {
+				try {
+					String args[] = {"Narf","localhost", "4444"};
+					ChatClient.main(args);
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}
+
+		MyThread serverThread = new MyThread();
+		serverThread.start();
+	}
+	// ////////////////////////////////////////////////////////////////////////////////////////////////
+	private void listen() {
+		String buffer;
+
+		// while ((buffer = in.readLine()) != null) {
+		// enteredText.insert(buffer + "\n", enteredText.getText().length());
+		// enteredText.setCaretPosition(enteredText.getText().length());
+		// }
+		// should never gets here unless the server dies...
+		while ((buffer = in.readLine()) != null) {
+
+			String[] pos = buffer.split(":");
+			System.out.println(pos[1]);
+			if (pos[1].equalsIgnoreCase(" add sheep")) {
+				createSheepForPlayer(pos[0], Integer.parseInt(pos[2]),
+						Integer.parseInt(pos[3]));
+			}
+			if (pos[1].equalsIgnoreCase(" a")) {
+				// System.out.println("HELLO");
+				String tester = pos[0];
+				System.out.println(tester);
+				for (Sheep i : sheeps) {
+					String compare = i.getMyOwner();
+					// System.out.println(compare);
+					if (compare != null) {
+						// System.out.println("made it");
+						if (compare.equalsIgnoreCase(tester)) {
+							i.setX(i.getX() - 1);
+							repaint();
+						}
+					}
+				}
+			}
+			if (pos[1].equalsIgnoreCase(" d")) {
+				// System.out.println("HELLO");
+				String tester = pos[0];
+				System.out.println(tester);
+				for (Sheep i : sheeps) {
+					String compare = i.getMyOwner();
+					// System.out.println(compare);
+					if (compare != null) {
+						// System.out.println("made it");
+						if (compare.equalsIgnoreCase(tester)) {
+							i.setX(i.getX() + 1);
+							repaint();
+						}
+					}
+				}
+			}
+			if (pos[1].equalsIgnoreCase(" s")) {
+				// System.out.println("HELLO");
+				String tester = pos[0];
+				System.out.println(tester);
+				for (Sheep i : sheeps) {
+					String compare = i.getMyOwner();
+					// System.out.println(compare);
+					if (compare != null) {
+						// System.out.println("made it");
+						if (compare.equalsIgnoreCase(tester)) {
+							i.setY(i.getY() + 1);
+							repaint();
+						}
+					}
+				}
+			}
+			if (pos[1].equalsIgnoreCase(" w")) {
+				// System.out.println("HELLO");
+				String tester = pos[0];
+				System.out.println(tester);
+				for (Sheep i : sheeps) {
+					String compare = i.getMyOwner();
+					// System.out.println(compare);
+					if (compare != null) {
+						// System.out.println("made it");
+						if (compare.equalsIgnoreCase(tester)) {
+							i.setY(i.getY() - 1);
+							repaint();
+						}
+					}
+				}
+			} else if (foundDaddy) {
+				// for anything in here to actually execute you must first run
+				// the command "I am your father" which makes
+				// you the root user.....................................
+				String player = pos[0];
+				System.out.println("[" + dadsName + "]");
+				if (player.equalsIgnoreCase(dadsName)) {
+					// /////////////////////////////root commands
+					// here//////////////////////////////////////
+					System.out.println("[" + pos[1] + "]");
+					commandEntered(pos[1]);
+
+					// ////////////////////////////////////////////////////////////////////////////////////
+				}
+
+				// /////////////////////////////player commands
+				// here//////////////////////////////////
+				Random random = new Random();
+				try {
+					setUpASheep(player, random.nextInt(12), random.nextInt(12));
+
+				} catch (Exception ex) {
+					System.out.println("Dude they just told you whats up?");
+				}
+
+				// ////////////////////////////////////////////////////////////////////////////////////
+			} else {
+				if (pos[1].equalsIgnoreCase(" i am your father")) {
+					this.foundDaddy = true;
+					this.dadsName = pos[0];
+					System.out.println("my Fathers Name Is " + dadsName);
+				} else {
+					System.out.println("im waiting for my father.");
+				}
+			}
+		}
+
+		out.close();
+		in.close();
+		try {
+			socket.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		System.out.println("closed client socket");
+	}
+
+	private void commandEntered(String string) {
+		try {
+			String[] breakUp = string.split("\\.");
+
+			System.out.println("[" + breakUp[0] + "]");
+			if (breakUp[0].equalsIgnoreCase(" move")) {
+				moveSomething(breakUp[1]);
+			} else {
+				if (breakUp[0].equalsIgnoreCase(" add")) {
+					addSomething(breakUp[1]);
+				} else {
+					if (breakUp[0].equalsIgnoreCase(" start")) {
+						letTheGamesBegin();
+					} else {
+						if (breakUp[0].equalsIgnoreCase(" zombie")) {
+							bringTolife(breakUp[1]);
+						} else {
+							if (breakUp[0].equalsIgnoreCase(" clear")) {
+								clearBoard(breakUp[1]);
+							}
+						}
+					}
+				}
+			}
+
+		} catch (Exception e) {
+			System.out.println("I don't understand");
+			return;
+		}
+	}
+
+	private void clearBoard(String string) {
+		System.out.println("function still not Implemented");
+	}
+
+	private void bringTolife(String breakUp) {
+		System.out.println(breakUp);
+		if (breakUp.equalsIgnoreCase("one")) {
+			makeOneSheepAlive();
+			return;
+		} else {
+			if (breakUp.equalsIgnoreCase("all")) {
+				makeAllSheepsAlive();
+				System.out.println("zombiesssssss");
+				return;
+			}
+		}
+		System.out.println("command not understood");
+	}
+
+	private void addSomething(String string) {
+		System.out.println(string);
+		try {
+			String[] breakUp = string.split("=");
+			String[] addTo = breakUp[1].split(",");
+			System.out.println(breakUp[0] + " " + addTo[0] + "," + addTo[1]);
+
+			if (breakUp[0].equalsIgnoreCase("sheep")) {
+
+				createSheep((Integer.parseInt(addTo[0])),
+						(Integer.parseInt(addTo[1])));
+
+				return;
+			} else {
+				if (breakUp[0].equalsIgnoreCase("wolf")) {
+					Wolf creature = new Wolf((Integer.parseInt(addTo[0])),
+							(Integer.parseInt(addTo[1])), WOLF_COLOR);
+					wolfs.add(creature);
+
+					rangeCanvas.addEntity(creature);
+					rangeCanvas.repaint();
+
+					return;
+
+				}
+			}
+			System.out.println("What kind of creature is that?");
+
+		} catch (Exception e) {
+			System.out.println("I don't understand");
+			return;
+		}
+
+	}
+
+	private void letTheGamesBegin() {
+		if (!wolfIsPushed) {
+
+			timer.start();
+			startMovingSheep();
+			wolfsPlayTag();
+			giveWolfHisSheep();
+			startMovingWolfs();
+
+			wolfIsPushed = true;
+		}
+
+	}
+
+	private void moveSomething(String string) {
+		try {
+			String[] breakUp = string.split("=");
+			String[] from = breakUp[0].split(",");
+			String[] mTo = breakUp[1].split(",");
+
+			for (Entity e : rangeCanvas.giveMeEntities()) {
+				if (e.getX() == Integer.parseInt(from[0])
+						&& e.getY() == Integer.parseInt(from[1])) {
+					e.setX(Integer.parseInt(mTo[0]));
+					e.setY(Integer.parseInt(mTo[1]));
+					System.out.println("okay he was moved");
+					rangeCanvas.repaint();
+					return;
+				}
+			}
+			System.out.println("Entity does not exist in location.");
+
+		} catch (Exception e) {
+			System.out.println("I don't understand");
+			return;
+		}
+
+	}
+
+	// ////////////////////////////////////////////////////////////////////////////////////////////////
+
+	private void setUpASheep(String player, int initX, int initY) {
+
+		// for(Sheep sheep: sheeps){
+		// if(sheep.getMyOwner().equals(player)){
+		// return;
+		// }
+		// }
+
+		// sorry had to comment this out to be able to not keep on adding sheep.
+		// createSheepForPlayer(player, initX, initY);
+
+	}
+
+	private void createSheepForPlayer(String player, int initX, int initY) {
+
+		int random = (int) (Math.random() * ((10 - 0) + 1));
+		Color playerColor = null;
+		if (random == 1) {
+			playerColor = new Color(255, 0, 0);
+		}
+		if (random == 2) {
+			playerColor = new Color(0, 255, 0);
+		}
+		if (random == 3) {
+			playerColor = new Color(0, 0, 255);
+		}
+		if (random == 4) {
+			playerColor = new Color(255, 255, 0);
+		}
+		if (random == 5) {
+			playerColor = new Color(255, 0, 255);
+		}
+		if (random == 6) {
+			playerColor = new Color(0, 255, 255);
+		}
+		if (random == 7) {
+			playerColor = new Color(255, 0, 125);
+		}
+		if (random == 8) {
+			playerColor = new Color(0, 100, 255);
+		}
+		if (random == 9) {
+			playerColor = new Color(0, 155, 255);
+		}
+		if (random == 10) {
+			playerColor = new Color(155, 255, 255);
+		}
+		Sheep playerSheep = new Sheep(initX, initY, playerColor);
+		playerSheep.setMyOwner(player);
+		this.sheeps.add(playerSheep);
+		rangeCanvas.addEntity(playerSheep);
+		giveWolfOneSheep(playerSheep);
+		rangeCanvas.repaint();
+	}
+
+	private void createSheep(int initX, int initY) {
+		Sheep newSheep = new Sheep(initX, initY, SHEEP_COLOR);
+		this.sheeps.add(newSheep);
+		rangeCanvas.addEntity(newSheep);
+		giveWolfOneSheep(newSheep);
+		rangeCanvas.repaint();
+	}
+	/*
+	 * @Override public void actionPerformed(ActionEvent e) { String message =
+	 * typedText.getText(); System.out.println(message); String outMessage =
+	 * userName + ": " + message;
+	 * 
+	 * if (message.startsWith("/")) outMessage = message;
+	 * 
+	 * out.println(outMessage); typedText.setText("");
+	 * typedText.requestFocusInWindow(); }
+	 */
 }
